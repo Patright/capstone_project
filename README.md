@@ -1,88 +1,54 @@
-This is the project repo for the final project of the Udacity Self-Driving Car Nanodegree: Programming a Real Self-Driving Car. For more information about the project, see the project introduction [here](https://classroom.udacity.com/nanodegrees/nd013/parts/6047fe34-d93c-4f50-8336-b70ef10cb4b2/modules/e1a23b06-329a-4684-a717-ad476f0d8dff/lessons/462c933d-9f24-42d3-8bdc-a08a5fc866e4/concepts/5ab4b122-83e6-436d-850f-9f4d26627fd9).
+# Capstone Project in Udacity's Self-Driving Car Nanodegree.
 
-Please use **one** of the two installation options, either native **or** docker installation.
+[//]: # (Image References)
 
-### Native Installation
 
-* Be sure that your workstation is running Ubuntu 16.04 Xenial Xerus or Ubuntu 14.04 Trusty Tahir. [Ubuntu downloads can be found here](https://www.ubuntu.com/download/desktop).
-* If using a Virtual Machine to install Ubuntu, use the following configuration as minimum:
-  * 2 CPU
-  * 2 GB system memory
-  * 25 GB of free hard drive space
+[image1]: ./examples/project-ros-graph.png
+[image2]: ./examples/waypoint-updater-ros-graph.png
+[image3]: ./examples/dbw-node-ros-graph.png
 
-  The Udacity provided virtual machine has ROS and Dataspeed DBW already installed, so you can skip the next two steps if you are using this.
+## Goal    
+For this project, I wrote ROS nodes to implement core functionality of the autonomous vehicle system, control, and waypoint following. I tested the code using a simulator that mimics the functionality on Carla.    
 
-* Follow these instructions to install ROS
-  * [ROS Kinetic](http://wiki.ros.org/kinetic/Installation/Ubuntu) if you have Ubuntu 16.04.
-  * [ROS Indigo](http://wiki.ros.org/indigo/Installation/Ubuntu) if you have Ubuntu 14.04.
-* Download the [Udacity Simulator](https://github.com/udacity/CarND-Capstone/releases).
+ 
+## System Architecture Diagram    
 
-### Docker Installation
-[Install Docker](https://docs.docker.com/engine/installation/)
+The following is a system architecture diagram showing the ROS nodes and topics used in the project.    
 
-Build the docker container
-```bash
-docker build . -t capstone
-```
+![alt text][image1]   
 
-Run the docker file
-```bash
-docker run -p 4567:4567 -v $PWD:/capstone -v /tmp/log:/root/.ros/ --rm -it capstone
-```
+## Code Structure   
 
-### Port Forwarding
-To set up port forwarding, please refer to the "uWebSocketIO Starter Guide" found in the classroom (see Extended Kalman Filter Project lesson).
+The ROS nodes can be found in the `https://github.com/Patright/capstone_project/tree/master/ros/src` directory.
 
-### Usage
+### Waypoint Updater
 
-1. Clone the project repository
-```bash
-git clone https://github.com/udacity/CarND-Capstone.git
-```
+`.../ros/src/waypoint_updater/`
 
-2. Install python dependencies
-```bash
-cd CarND-Capstone
-pip install -r requirements.txt
-```
-3. Make and run styx
-```bash
-cd ros
-catkin_make
-source devel/setup.sh
-roslaunch launch/styx.launch
-```
-4. Run the simulator
+This package contains the waypoint updater node: `waypoint_updater.py`. The purpose of this node is to update the target velocity property of each waypoint based on traffic light and obstacle detection data. This node will subscribe to the `/base_waypoints`, `/current_pose`, `/obstacle_waypoint`, and `/traffic_waypoint` topics, and publish a list of waypoints ahead of the car with target velocities to the `/final_waypoints` topic.   
+![alt text][image2]   
 
-### Real world testing
-1. Download [training bag](https://s3-us-west-1.amazonaws.com/udacity-selfdrivingcar/traffic_light_bag_file.zip) that was recorded on the Udacity self-driving car.
-2. Unzip the file
-```bash
-unzip traffic_light_bag_file.zip
-```
-3. Play the bag file
-```bash
-rosbag play -l traffic_light_bag_file/traffic_light_training.bag
-```
-4. Launch your project in site mode
-```bash
-cd CarND-Capstone/ros
-roslaunch launch/site.launch
-```
-5. Confirm that traffic light detection works on real life images
 
-### Other library/driver information
-Outside of `requirements.txt`, here is information on other driver/library versions used in the simulator and Carla:
+### Twist Controller   
 
-Specific to these libraries, the simulator grader and Carla use the following:
+Carla is equipped with a drive-by-wire (dbw) system, meaning the throttle, brake, and steering have electronic control. This package contains the files that are responsible for control of the vehicle: the node `dbw_node.py` and the file `twist_controller.py`, along with a pid and lowpass filter that you can use in your implementation. The dbw_node subscribes to the `/current_velocity` topic along with the `/twist_cmd` topic to receive target linear and angular velocities. Additionally, this node will subscribe to `/vehicle/dbw_enabled`, which indicates if the car is under dbw or driver control. This node will publish throttle, brake, and steering commands to the `/vehicle/throttle_cmd`, `/vehicle/brake_cmd`, and `/vehicle/steering_cmd` topics.   
 
-|        | Simulator | Carla  |
-| :-----------: |:-------------:| :-----:|
-| Nvidia driver | 384.130 | 384.130 |
-| CUDA | 8.0.61 | 8.0.61 |
-| cuDNN | 6.0.21 | 6.0.21 |
-| TensorRT | N/A | N/A |
-| OpenCV | 3.2.0-dev | 2.4.8 |
-| OpenMP | N/A | N/A |
+![alt text][image3]
 
-We are working on a fix to line up the OpenCV versions between the two.
+
+### Helper Packages
+   
+`.../ros/src/styx/` contains a server for communicating with the simulator, and a bridge to translate and publish simulator messages to ROS topics.   
+
+`.../ros/src/styx_msgs/` includes definitions of the custom ROS message types used in the project.   
+
+`.../ros/src/waypoint_loader/` loads the static waypoint data and publishes to `/base_waypoints`.   
+
+`.../ros/src/waypoint_follower/` contains code from Autoware which subscribes to `/final_waypoints` and publishes target vehicle linear and angular velocities in the form of twist commands to the `/twist_cmd topic`.   
+
+## Project Development
+
+At first I worked on the waypoint updater node `waypoint_updater.py`. It subscribes to `/base_waypoints` and `/current_pose` and publishes to `/final_waypoints`. Those final waypoints are used to guide the car on the track, the waypoint_follower node can now start publishing messages to the `/twist_cmd` topic. That input is prossesed in the drive by wire node `dbw_node.py`. Now the car is able to drive in the simulator but without paying attention to the traffic lights.   
+The traffic light information (location and status "green", "yellow", "red") is given by `/vehicle/traffic_lights` and can directly be used in the ROS node `tl_detector.py` to publish it as waypoint indices.
+Then I completed the waypoint updater node. I used `/traffic_waypoint` to change the waypoint target velocities before publishing to `/final_waypoints`.   
+Now the car stops at red traffic lights and moves when they are green.
